@@ -1,5 +1,4 @@
-const API_URL = "http://localhost:1825"
-const WEBSOCKET_SERVER = "ws://localhost:1934"
+import {WEBSOCKET_URL, API_URL} from "./config.js";
 
 let ACTIVE_MARKER
 
@@ -27,7 +26,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 map.on("click", clearActiveMarker)
 
-const ws = new WebSocket(WEBSOCKET_SERVER)
+const ws = new WebSocket(WEBSOCKET_URL)
 
 ws.onmessage = (event) => {
     let data = JSON.parse(event.data)
