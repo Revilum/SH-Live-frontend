@@ -60,7 +60,7 @@ ws.onmessage = (event) => {
                     const newMarkers = trip.trip.stopovers.map((stopover) => {
                         let stationText = `${stopover.stop.name}`
                         if (stopover.arrival !== null) {
-                            stationText += `<br>Ankunft: ${(new Date(stopover.departure)).toLocaleTimeString("de-DE", {hour: '2-digit', minute:'2-digit'})}`
+                            stationText += `<br>Ankunft: ${(new Date(stopover.arrival)).toLocaleTimeString("de-DE", {hour: '2-digit', minute:'2-digit'})}`
                         }
                         if (stopover.departure !== null) {
                             stationText += `<br>Abfahrt: ${(new Date(stopover.departure)).toLocaleTimeString("de-DE", {hour: '2-digit', minute:'2-digit'})}`
