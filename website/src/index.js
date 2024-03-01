@@ -24,7 +24,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map);
 
-map.on("click", clearActiveMarker)
+map.on("click", () => clearMarker(ACTIVE_MARKER))
 
 const ws = new WebSocket(WEBSOCKET_URL)
 
@@ -39,7 +39,7 @@ ws.onmessage = (event) => {
             const newMarker = L.marker([train.location.latitude, train.location.longitude], {icon: trainIcon})
                 .bindPopup(train.line.name + " nach " + train.direction, {autoPan: false})
                 .on("click", async () => { // get the current trip.
-                    clearActiveMarker()
+                    clearMarker(ACTIVE_MARKER)
                     ACTIVE_MARKER = train.tripId
                     let response = await fetch(API_URL + "/trip", {
                         method: "POST",
@@ -48,23 +48,31 @@ ws.onmessage = (event) => {
                             "Content-Type": "application/json"
                         }
                     })
-                    let trip = await response.json()
+                    let trip = (await response.json()).trip
                     // draw path to map
-                    let line = trip.trip.polyline.features.map((x) => x.geometry.coordinates.reverse())
+                    let line = trip.polyline.features.map((x) => x.geometry.coordinates.reverse())
                     MARKERS[train.tripId].layers.push(L.polyline(line, {
                         color: "blue",
                         weight: 4,
                         opacity: 1
                     }).addTo(map))
                     // add stations with current departure
-                    const newMarkers = trip.trip.stopovers.map((stopover) => {
-                        let stationText = `${stopover.stop.name}`
+                    const newMarkers = trip.stopovers.map((stopover) => {
+                        let stationText = `<b>${stopover.stop.name}</b>`
                         if (stopover.arrival !== null) {
                             stationText += `<br>Ankunft: ${(new Date(stopover.arrival)).toLocaleTimeString("de-DE", {hour: '2-digit', minute:'2-digit'})}`
                         }
                         if (stopover.departure !== null) {
                             stationText += `<br>Abfahrt: ${(new Date(stopover.departure)).toLocaleTimeString("de-DE", {hour: '2-digit', minute:'2-digit'})}`
                         }
+                        if (stopover.remarks !== undefined) {
+                            stopover.remarks.forEach((remark) => {
+                                if (remark.type === "warning" && remark.products[trip.line.product]) {
+                                    stationText += `<br>${remark.text}`
+                                }
+                            })
+                        }
+
 
                         return L.marker([stopover.stop.location.latitude, stopover.stop.location.longitude])
                             .bindPopup(stationText)
@@ -96,10 +104,8 @@ function clearMarker(cMarker) {
     if (cMarker !== undefined) {
         MARKERS[cMarker].layers.forEach((m) => map.removeLayer(m))
         MARKERS[cMarker].layers = []
+        if (cMarker === ACTIVE_MARKER) {
+            ACTIVE_MARKER = undefined
+        }
     }
-}
-
-function clearActiveMarker() {
-    clearMarker(ACTIVE_MARKER)
-    ACTIVE_MARKER = undefined
 }
