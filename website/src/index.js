@@ -57,16 +57,14 @@ async function deselectMarker(cMarker) {
     if (cMarker !== undefined) { // train hasn't been removed already or no train is selected
         (await MARKERS[cMarker].layers).forEach((m) => map.removeLayer(m))
         MARKERS[cMarker].layers = []
-        if (cMarker === ACTIVE_MARKER) {
-            ACTIVE_MARKER = undefined
-        }
     }
 }
 
 async function selectMarker(tripId) {
-    MARKERS[tripId].layers = new Promise(async (resolve, _) => {
+    const layerBuffer = new Promise(async (resolve, _) => {
+
         const oldActiveMarker = ACTIVE_MARKER
-        ACTIVE_MARKER = tripId // setting ACTIVE_MARKER before deselecting is needed if deselecting takes too long
+        ACTIVE_MARKER = tripId; // setting ACTIVE_MARKER before deselecting is needed if deselecting takes too long
         await deselectMarker(oldActiveMarker)
         let trip = (await fetchPOST("trip", {id: tripId})).trip
         // add station markers
@@ -79,6 +77,9 @@ async function selectMarker(tripId) {
         newMarkers.push(getPolylineFromTrip(trip)) // draw train path to map and add it to the markers
         resolve(newMarkers)
     })
+
+    await layerBuffer
+    MARKERS[tripId].layers = new Promise((resolve, _) => resolve(layerBuffer))
 }
 
 async function selectMarkerFromHash() {
@@ -148,9 +149,7 @@ async function shittyWorkaround(id) {
         const myArrival = new Date(marker.data.nextStopovers.slice(-1)[0].plannedArrival)
         const theirArrival = new Date(data.stops.slice(-1)[0].stop.arrival.plannedTime)
 
-        if (myArrival === theirArrival) {console.log(trip)}
-
-        if (marker.data.line.id === data.line.toLowerCase() && marker.data.direction === data.stops.slice(-1)[0].info.name
+        if (marker.data.line.id.replace(/\D/g, "") === data.line.toLowerCase() && marker.data.direction === data.stops.slice(-1)[0].info.name
         && myArrival.toISOString() === theirArrival.toISOString()) {
             console.log(trip)
             return trip
