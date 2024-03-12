@@ -149,8 +149,14 @@ async function shittyWorkaround(id) {
         const myArrival = new Date(marker.data.nextStopovers.slice(-1)[0].plannedArrival)
         const theirArrival = new Date(data.stops.slice(-1)[0].stop.arrival.plannedTime)
 
-        if (marker.data.line.id.replace(/\D/g, "") === data.line.toLowerCase() && marker.data.direction === data.stops.slice(-1)[0].info.name
-        && myArrival.toISOString() === theirArrival.toISOString()) {
+        /*if (myArrival.toISOString() === theirArrival.toISOString()) {
+            console.log(marker.data.line.id.replace(/\D/g, "") + " " + data.line.toLowerCase().replace(/\D/g, ""))
+            console.log(marker.data.direction + " " + data.stops.slice(-1)[0].info.name)
+        }*/
+
+        if (marker.data.line.id.replace(/\D/g, "") === data.line.toLowerCase().replace(/\D/g, "")
+            && marker.data.direction === data.stops.slice(-1)[0].info.name
+            && myArrival.toISOString() === theirArrival.toISOString()) {
             console.log(trip)
             return trip
         }
