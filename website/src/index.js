@@ -92,7 +92,7 @@ async function selectMarkerFromHash() {
         if (tripId === undefined) { return } // delete
 
         map.flyTo(MARKERS[tripId].marker.getLatLng(), 12, conf.FOCUS_ANIMATION)
-        await selectMarker(tripId)
+        MARKERS[tripId].marker.fire("click")
     } else {
         //TODO: nice popup which informs the user that the train has already terminated or has started
     }
