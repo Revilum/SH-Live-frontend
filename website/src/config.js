@@ -23,8 +23,14 @@ const TRAIN_OPTIONS = {
     icon: trainIcon
 }
 
+//leaflet focus animation
+const FOCUS_ANIMATION = {
+    duration: 1,
+    animate: true,
+}
+
 // time format
 
 const TIME_FORMAT = {hour: '2-digit', minute:'2-digit'}
 
-export {WEBSOCKET_URL, API_URL, LINE_OPTIONS, TIME_FORMAT, TRAIN_OPTIONS}
+export {WEBSOCKET_URL, API_URL, LINE_OPTIONS, TIME_FORMAT, TRAIN_OPTIONS, FOCUS_ANIMATION}

@@ -4,9 +4,11 @@ import * as conf from "./config.js";
 let ACTIVE_MARKER = undefined
 const MARKERS = {}
 
+let HASH_WAS_NOT_HIGHLIGHT = true
+
 const map = L.map('map', {
-    center: [54.3126897, 10.129182],
-    zoom: 17
+    center: [54.1958021,9.5727771],
+    zoom: 9
 })
 
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -20,42 +22,30 @@ const ws = new WebSocket(conf.WEBSOCKET_URL)
 
 ws.onmessage = async (event) => {
     const data = JSON.parse(event.data)
-    const currentUpdateTime = Date.now().toString()
     data.movements.forEach((train) => {
         if (MARKERS[train.tripId] !== undefined) { // train is already present on the map
-            updateTrain(train, currentUpdateTime) // update position of the train on the map
+            updateTrain(train, data.realtimeDataUpdatedAt) // update position of the train on the map
         } else { // train is new and needs to be added to the map
             const newMarker = L.marker([train.location.latitude, train.location.longitude], conf.TRAIN_OPTIONS)
                 .bindPopup(train.line.name + " nach " + train.direction, {autoPan: false})
                 .on("click", async () => { // get the current trip.
-                    MARKERS[train.tripId].layers = new Promise(async (resolve, _) => {
-                        const oldActiveMarker = ACTIVE_MARKER
-                        ACTIVE_MARKER = train.tripId
-                        await deselectMarker(oldActiveMarker)
-                        let trip = (await fetchPOST("trip", {id: train.tripId})).trip
-                        // add station markers
-                        const newMarkers = (trip.stopovers.map((stopover) =>
-                            L.marker([stopover.stop.location.latitude, stopover.stop.location.longitude])
-                                .bindPopup(getStationTextFromStopover(stopover, trip.line.product))
-                                .addTo(map)
-                        ))
-
-                        newMarkers.push(getPolylineFromTrip(trip)) // draw train path to map and add it to the markers
-                        resolve(newMarkers)
-                        // setTimeout(() => resolve(newMarkers), 10)
-                    })
+                    await selectMarker(train.tripId)
                 }).addTo(map)
             // store new train
             MARKERS[train.tripId] = {
                 marker: newMarker,
                 layers: new Promise((resolve, _) => resolve([])),
-                lastUpdate: currentUpdateTime
+                lastUpdate: data.realtimeDataUpdatedAt,
+                data: train
             }
         }
     })
+
+    await selectMarkerFromHash() // auto highlights train from url if present
+
     // remove all trains that were not present since the last update => train has finished its route
     for (const [trip, marker] of Object.entries(MARKERS)) {
-        if (marker.lastUpdate !== currentUpdateTime) {
+        if (marker.lastUpdate !== data.realtimeDataUpdatedAt) {
             await deselectMarker(trip)
             map.removeLayer(marker.marker)
             delete MARKERS[trip]
@@ -70,6 +60,41 @@ async function deselectMarker(cMarker) {
         if (cMarker === ACTIVE_MARKER) {
             ACTIVE_MARKER = undefined
         }
+    }
+}
+
+async function selectMarker(tripId) {
+    MARKERS[tripId].layers = new Promise(async (resolve, _) => {
+        const oldActiveMarker = ACTIVE_MARKER
+        ACTIVE_MARKER = tripId // setting ACTIVE_MARKER before deselecting is needed if deselecting takes too long
+        await deselectMarker(oldActiveMarker)
+        let trip = (await fetchPOST("trip", {id: tripId})).trip
+        // add station markers
+        const newMarkers = (trip.stopovers.map((stopover) =>
+            L.marker([stopover.stop.location.latitude, stopover.stop.location.longitude])
+                .bindPopup(getStationTextFromStopover(stopover, trip.line.product))
+                .addTo(map)
+        ))
+
+        newMarkers.push(getPolylineFromTrip(trip)) // draw train path to map and add it to the markers
+        resolve(newMarkers)
+    })
+}
+
+async function selectMarkerFromHash() {
+    const hash = window.location.hash
+    //if (HASH_WAS_NOT_HIGHLIGHT && hash !== "" && hash.substring(1) in MARKERS) {
+    if (HASH_WAS_NOT_HIGHLIGHT && hash !== "") {
+        //const tripId = hash.substring(1)
+        const tripId = await shittyWorkaround(hash.substring(1))
+        HASH_WAS_NOT_HIGHLIGHT = false
+
+        if (tripId === undefined) { return } // delete
+
+        map.flyTo(MARKERS[tripId].marker.getLatLng(), 12, conf.FOCUS_ANIMATION)
+        await selectMarker(tripId)
+    } else {
+        //TODO: nice popup which informs the user that the train has already terminated or has started
     }
 }
 
@@ -113,3 +138,22 @@ function getStationTextFromStopover(station, product) {
 
 const getPolylineFromTrip = (trip) =>
     L.polyline(trip.polyline.features.map((x) => x.geometry.coordinates.reverse()), conf.LINE_OPTIONS).addTo(map)
+
+
+async function shittyWorkaround(id) {
+   const req = await fetch("https://derbusnachraisdorf.de/bahn/api/trip/" + id)
+    const data = await req.json()
+
+    for (const [trip, marker] of Object.entries(MARKERS)) {
+        const myArrival = new Date(marker.data.nextStopovers.slice(-1)[0].plannedArrival)
+        const theirArrival = new Date(data.stops.slice(-1)[0].stop.arrival.plannedTime)
+
+        if (myArrival === theirArrival) {console.log(trip)}
+
+        if (marker.data.line.id === data.line.toLowerCase() && marker.data.direction === data.stops.slice(-1)[0].info.name
+        && myArrival.toISOString() === theirArrival.toISOString()) {
+            console.log(trip)
+            return trip
+        }
+    }
+}
